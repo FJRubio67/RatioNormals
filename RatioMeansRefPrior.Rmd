@@ -1,0 +1,80 @@
+---
+title: "Bayesian inference for the ratio of the means of two normals"
+author: '[F. Javier Rubio](https://sites.google.com/site/fjavierrubio67/)'
+date: "28/06/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Bayesian inference for the ratio of the means of two normal populations with unequal variances
+
+Let $(x_1,\dots,x_n)$ and $(y_1,\dots,y_m)$ be two independent random samples such that
+
+$$ x_i \sim N(\mu,\sigma_1^2) \,\,\, \text{and} \,\,\, y_j \sim N(\eta,\sigma_2^2).$$
+
+Denote $\phi = \frac{\mu}{\eta}$. [1] presents a tractable expression for the marginal posterior of $\phi$, the ratio of means, for the case when the prior for $(\mu,\eta,\sigma_1^2,\sigma_2^2)$ is the reference prior [2]. The following R code presents the posterior distribution of $\phi$ for a real data set (see [1] and [3]).
+
+**References.**
+
+1. [Letter to the Editor: Bayesian inference for the ratio of the means of two normal populations with unequal variances](http://onlinelibrary.wiley.com/doi/10.1002/bimj.200800256/abstract)
+
+2. [The formal definition of reference priors](https://projecteuclid.org/euclid.aos/1236693154)
+
+3. [Bayesian Inference for the Ratio of the Means of Two Normal Populations with Unequal Variances](http://onlinelibrary.wiley.com/doi/10.1002/(SICI)1521-4036(199905)41:2%3C133%3A%3AAID-BIMJ133%3E3.0.CO;2-5/abstract)
+
+```{r}
+rm(list=ls())
+library(cubature)
+
+# Good Soil Type.
+xx = c(5.9, 3.8, 6.5, 18.3, 18.2, 16.1, 7.6)
+
+#Poor Soil Type.
+yy = c(7.6, 0.4, 1.1, 3.2, 6.5, 4.1, 4.7)
+
+n = length(xx)
+m = length(yy)
+xb = mean(xx)
+yb = mean(yy)
+sx = sum((xx-xb)^2)/n
+sy = sum((yy-xb)^2)/m
+
+#Posterior distribution of Phi and u. General Model (Rubio and Perez-Elizalde; 2009)
+
+s <- Vectorize(function(w) (1 - w)*sx + w*sy)
+
+t <- function(phi,u){
+  var <- sqrt( ((n+m-1)*((1-u)*phi^2+u))/(s(u) + (u*(1-u))*(xb-phi*yb)/((1-u)*phi^2+u)) )*( - ((1-u)*phi*xb + u*yb)/((1-u)*phi^2 + u) )
+  return(var)
+}
+
+DF <- function(w,u) pt(t(w,u),df=(n+m-1))
+
+posterior <- function(par){
+  phi <- par[1]; u <- par[2];
+  var <- phi^(-0.5)*u^(0.5*m-1)*(1-u)^(0.5*n-1)*( (1-u)*phi^2 + u )^(-0.5)*
+    ( s(u) + (u*(1-u))/((1-u)*phi^2 + u)*(xb-phi*yb)^2  )^(-0.5*(n+m-1))/(1-DF(phi,u))
+  return(var)
+} 
+
+cte <- adaptIntegrate(posterior, c(0,0), c(1e12,1), tol = 1e-09)$integral
+
+# Marginal posterior of Phi
+
+pipost <- Vectorize( function(phi){
+  tempf <- Vectorize(function(x)  posterior(c(phi,x)) )
+  val <- integrate(tempf,0,1)$value
+  return(val/cte)
+  })
+
+# Plot of the posterior of Phi
+curve(pipost,0.001,10,n=1000,xlab=~phi,ylab="Posterior density",main="General Model",lwd=2,cex.axis=1.5,cex.lab=1.5)
+
+# A  95% credible interval
+integrate(pipost,0,166.2185)
+
+```
+
